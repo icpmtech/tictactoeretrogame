@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tic Tac Toe - cantinhode.net code academy</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --retro-green: #00FF00;
+      --retro-bg: #001100;
+      --border-color: #007700;
+      --scanline: rgba(0, 255, 0, 0.05);
+    }
+    /* Base reset and typography */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'VT323', monospace;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--retro-bg);
+      color: var(--retro-green);
+      overflow: hidden;
+    }
+    /* CRT scanline effect */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(0deg, var(--scanline) 0px, var(--scanline) 2px, transparent 2px, transparent 4px);
+      pointer-events: none;
+      z-index: 999;
+    }
+    /* Fixed header with TikTok-inspired neon gradient */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 15px 0;
+      text-align: center;
+      background: transparent;
+      z-index: 1000;
+    }
+    .header-title {
+      font-size: 2rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      background: linear-gradient(45deg, #ff0057, #fffd00, #00ff87, #00f0ff, #ff0057);
+      background-size: 300%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: neonGradient 3s linear infinite;
+    }
+    @keyframes neonGradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    /* Main wrapper shifted down to avoid fixed header overlap */
+    #mainWrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 80px 10px 10px;
+    }
+    /* Language selector */
+    #languageSelector {
+      margin-bottom: 20px;
+      padding: 5px;
+      font-size: 1.2rem;
+      background: black;
+      color: var(--retro-green);
+      border: 2px solid var(--border-color);
+      border-radius: 5px;
+    }
+    /* Game title */
+    .main-title {
+      margin-bottom: 10px;
+      animation: titleAnimation 2s infinite ease-in-out;
+    }
+    @keyframes titleAnimation {
+      0% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); opacity: 0.8; }
+    }
+    /* Game board */
+    .game-container {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 5px;
+      border: 2px solid var(--border-color);
+      padding: 5px;
+      background: black;
+      box-shadow: 0 0 20px var(--retro-green);
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    /* Buttons */
+    .button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      background: black;
+      color: var(--retro-green);
+      border: 2px solid var(--border-color);
+      cursor: pointer;
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+    .button:hover { background: var(--border-color); }
+    /* Share confirmation */
+    .share-confirmation {
+      margin-top: 10px;
+      font-size: 1rem;
+      color: var(--retro-green);
+      display: none;
+    }
+    /* Status display */
+    #status {
+      margin-top: 20px;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-title">cantinhode.net code academy</div>
+  </header>
+  <div id="mainWrapper">
+    <select id="languageSelector">
+      <option value="pt">🇵🇹 Português</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="en">🇬🇧 English</option>
+    </select>
+    <h1 id="gameTitle" class="main-title">Jogo da Cruz Roda</h1>
+    <div class="game-container" id="gameBoard">
+      <div class="cell" data-index="0"></div>
+      <div class="cell" data-index="1"></div>
+      <div class="cell" data-index="2"></div>
+      <div class="cell" data-index="3"></div>
+      <div class="cell" data-index="4"></div>
+      <div class="cell" data-index="5"></div>
+      <div class="cell" data-index="6"></div>
+      <div class="cell" data-index="7"></div>
+      <div class="cell" data-index="8"></div>
+    </div>
+    <div id="status">Vez de: <span id="turn">X</span></div>
+    <button id="restart" class="button">Reiniciar Jogo</button>
+    <button id="shareGame" class="button">🔗 Partilhar</button>
+    <div class="share-confirmation" id="shareConfirmation">Link copiado!</div>
+  </div>
+  <script>
+    // --- Translation Data ---
+    const translations = {
+      pt: {
+        title: "Jogo da Cruz Roda",
+        turn: "Vez de: ",
+        victory: "Vitória de ",
+        tie: "Empate!",
+        restart: "Reiniciar Jogo",
+        share: "🔗 Partilhar",
+        shareConfirmation: "Link copiado!"
+      },
+      fr: {
+        title: "Jeu de Morpion",
+        turn: "Tour de: ",
+        victory: "Victoire de ",
+        tie: "Match nul!",
+        restart: "Recommencer le jeu",
+        share: "🔗 Partager",
+        shareConfirmation: "Lien copié!"
+      },
+      en: {
+        title: "Tic Tac Toe",
+        turn: "Turn: ",
+        victory: "Victory for ",
+        tie: "Tie!",
+        restart: "Restart Game",
+        share: "🔗 Share",
+        shareConfirmation: "Link copied!"
+      }
+    };
+
+    let currentLang = "pt"; // default language
+
+    // --- Update UI texts based on current language ---
+    function updateLanguageUI() {
+      const trans = translations[currentLang];
+      document.getElementById("gameTitle").innerText = trans.title;
+      if (gameActive) {
+        statusDisplay.innerText = trans.turn + currentPlayer;
+      }
+      restartButton.innerText = trans.restart;
+      shareButton.innerText = trans.share;
+      shareConfirmation.innerText = trans.shareConfirmation;
+      document.title = trans.title + " - cantinhode.net code academy";
+    }
+
+    // --- Language selector event listener ---
+    const languageSelector = document.getElementById("languageSelector");
+    languageSelector.addEventListener("change", (e) => {
+      currentLang = e.target.value;
+      updateLanguageUI();
+    });
+
+    // --- Audio Setup ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(frequency, type, duration) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = frequency;
+      osc.type = type;
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // --- Game Setup ---
+    const cells = document.querySelectorAll('.cell');
+    const turnDisplay = document.getElementById('turn');
+    const statusDisplay = document.getElementById('status');
+    const restartButton = document.getElementById('restart');
+    const shareButton = document.getElementById('shareGame');
+    const shareConfirmation = document.getElementById('shareConfirmation');
+    
+    let board = ["", "", "", "", "", "", "", "", ""];
+    let currentPlayer = "X";
+    let gameActive = true;
+    
+    const winningConditions = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
+      [0, 4, 8],
+      [2, 4, 6]
+    ];
+    
+    function handleResultValidation() {
+      let roundWon = false;
+      for (let condition of winningConditions) {
+        const [a, b, c] = condition;
+        if (board[a] === "" || board[b] === "" || board[c] === "") continue;
+        if (board[a] === board[b] && board[b] === board[c]) {
+          roundWon = true;
+          break;
+        }
+      }
+      const trans = translations[currentLang];
+      if (roundWon) {
+        statusDisplay.innerText = trans.victory + currentPlayer + "!";
+        playSound(300, 'sine', 0.5);
+        gameActive = false;
+        return;
+      }
+      if (!board.includes("")) {
+        statusDisplay.innerText = trans.tie;
+        gameActive = false;
+        return;
+      }
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      turnDisplay.innerText = currentPlayer;
+      statusDisplay.innerText = trans.turn + currentPlayer;
+    }
+    
+    function handleCellClick(event) {
+      const cell = event.target;
+      const index = cell.getAttribute('data-index');
+      if (board[index] !== "" || !gameActive) return;
+      board[index] = currentPlayer;
+      cell.innerText = currentPlayer;
+      playSound(600, 'square', 0.1);
+      handleResultValidation();
+    }
+    
+    cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+    
+    restartButton.addEventListener('click', () => {
+      board = ["", "", "", "", "", "", "", "", ""];
+      gameActive = true;
+      currentPlayer = "X";
+      turnDisplay.innerText = currentPlayer;
+      statusDisplay.innerText = translations[currentLang].turn + currentPlayer;
+      cells.forEach(cell => cell.innerText = "");
+      playSound(500, 'triangle', 0.2);
+    });
+    
+    shareButton.addEventListener("click", async () => {
+      const gameUrl = window.location.href;
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: translations[currentLang].title,
+            text: "Joga este jogo incrível!",
+            url: gameUrl
+          });
+        } catch (error) {
+          console.error("Erro ao partilhar:", error);
+        }
+      } else {
+        // Fallback: Copy the link to the clipboard
+        navigator.clipboard.writeText(gameUrl).then(() => {
+          shareConfirmation.style.display = "block";
+          setTimeout(() => { shareConfirmation.style.display = "none"; }, 2000);
+        });
+      }
+    });
+    
+    // Set initial UI language.
+    updateLanguageUI();
+  </script>
+</body>
+</html>
