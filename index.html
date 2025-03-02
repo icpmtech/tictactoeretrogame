@@ -25,6 +25,7 @@
       background: var(--retro-bg);
       color: var(--retro-green);
       overflow: hidden;
+      position: relative;
     }
     /* CRT scanline effect */
     body::before {
@@ -70,6 +71,7 @@
       justify-content: center;
       min-height: 100vh;
       padding: 80px 10px 10px;
+      position: relative;
     }
     /* Language selector */
     #languageSelector {
@@ -93,6 +95,7 @@
     }
     /* Game board */
     .game-container {
+      position: relative;
       display: grid;
       grid-template-columns: repeat(3, 100px);
       grid-template-rows: repeat(3, 100px);
@@ -112,6 +115,14 @@
       font-size: 2.5rem;
       cursor: pointer;
       user-select: none;
+    }
+    /* Canvas overlay for win line */
+    #winCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
     }
     /* Buttons */
     .button {
@@ -137,6 +148,24 @@
       margin-top: 20px;
       font-size: 1.2rem;
     }
+    /* Basic explosion particle style */
+    .particle {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background: var(--retro-green);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 1;
+      animation: particleAnim 0.8s forwards;
+    }
+    @keyframes particleAnim {
+      to {
+        transform: translate(var(--dx), var(--dy));
+        opacity: 0;
+      }
+    }
   </style>
   <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
@@ -144,7 +173,7 @@
         t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
         y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
     })(window, document, "clarity", "script", "qhtjo5np8r");
-</script>
+  </script>
 </head>
 <body>
   <header>
@@ -158,6 +187,8 @@
     </select>
     <h1 id="gameTitle" class="main-title">Jogo da Cruz Roda</h1>
     <div class="game-container" id="gameBoard">
+      <!-- The canvas is placed inside the game container to overlay the cells -->
+      <canvas id="winCanvas"></canvas>
       <div class="cell" data-index="0"></div>
       <div class="cell" data-index="1"></div>
       <div class="cell" data-index="2"></div>
@@ -248,11 +279,22 @@
     const restartButton = document.getElementById('restart');
     const shareButton = document.getElementById('shareGame');
     const shareConfirmation = document.getElementById('shareConfirmation');
-    
+    const gameBoard = document.getElementById('gameBoard');
+    const winCanvas = document.getElementById('winCanvas');
+    const ctx = winCanvas.getContext('2d');
+
+    // Set the canvas size to match the game board
+    function resizeCanvas() {
+      winCanvas.width = gameBoard.clientWidth;
+      winCanvas.height = gameBoard.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
     let board = ["", "", "", "", "", "", "", "", ""];
     let currentPlayer = "X";
     let gameActive = true;
-    
+
     const winningConditions = [
       [0, 1, 2],
       [3, 4, 5],
@@ -263,14 +305,60 @@
       [0, 4, 8],
       [2, 4, 6]
     ];
-    
+
+    // Function to draw a win line based on winning indices
+    function drawWinLine(indices) {
+      // Calculate the center positions of the first and last cell in the winning condition
+      const cellSize = 100; // As defined in CSS
+      function getCenter(index) {
+        const row = Math.floor(index / 3);
+        const col = index % 3;
+        return { x: col * (cellSize + 5) + cellSize/2 + 5, // +5 for initial padding/gap offset
+                 y: row * (cellSize + 5) + cellSize/2 + 5 };
+      }
+      const start = getCenter(indices[0]);
+      const end = getCenter(indices[2]);
+      
+      // Draw the line on the canvas
+      ctx.strokeStyle = 'red';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+    }
+
+    // Simple explosion effect using particles
+    function explosionAnimation(x, y) {
+      const numParticles = 20;
+      for (let i = 0; i < numParticles; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        // Place particle at the explosion origin
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        // Random displacement for the particle using CSS variables
+        const dx = (Math.random() - 0.5) * 100 + 'px';
+        const dy = (Math.random() - 0.5) * 100 + 'px';
+        particle.style.setProperty('--dx', dx);
+        particle.style.setProperty('--dy', dy);
+        gameBoard.appendChild(particle);
+        // Remove the particle after the animation
+        particle.addEventListener('animationend', () => {
+          particle.remove();
+        });
+      }
+    }
+
     function handleResultValidation() {
       let roundWon = false;
+      let winningIndices = [];
       for (let condition of winningConditions) {
         const [a, b, c] = condition;
         if (board[a] === "" || board[b] === "" || board[c] === "") continue;
         if (board[a] === board[b] && board[b] === board[c]) {
           roundWon = true;
+          winningIndices = condition;
           break;
         }
       }
@@ -279,6 +367,13 @@
         statusDisplay.innerText = trans.victory + currentPlayer + "!";
         playSound(300, 'sine', 0.5);
         gameActive = false;
+        // Draw the winning line
+        drawWinLine(winningIndices);
+        // Trigger explosion effect at the center of the win line
+        const cellSize = 100;
+        const centerX = ((Math.floor(winningIndices[0] / 3) + Math.floor(winningIndices[2] / 3)) / 2) * (cellSize + 5) + cellSize/2 + 5;
+        const centerY = (((winningIndices[0] % 3) + (winningIndices[2] % 3)) / 2) * (cellSize + 5) + cellSize/2 + 5;
+        explosionAnimation(centerX, centerY);
         return;
       }
       if (!board.includes("")) {
@@ -290,7 +385,7 @@
       turnDisplay.innerText = currentPlayer;
       statusDisplay.innerText = trans.turn + currentPlayer;
     }
-    
+
     function handleCellClick(event) {
       const cell = event.target;
       const index = cell.getAttribute('data-index');
@@ -300,9 +395,9 @@
       playSound(600, 'square', 0.1);
       handleResultValidation();
     }
-    
+
     cells.forEach(cell => cell.addEventListener('click', handleCellClick));
-    
+
     restartButton.addEventListener('click', () => {
       board = ["", "", "", "", "", "", "", "", ""];
       gameActive = true;
@@ -310,9 +405,11 @@
       turnDisplay.innerText = currentPlayer;
       statusDisplay.innerText = translations[currentLang].turn + currentPlayer;
       cells.forEach(cell => cell.innerText = "");
+      // Clear the canvas for the win line
+      ctx.clearRect(0, 0, winCanvas.width, winCanvas.height);
       playSound(500, 'triangle', 0.2);
     });
-    
+
     shareButton.addEventListener("click", async () => {
       const gameUrl = window.location.href;
       if (navigator.share) {
@@ -333,7 +430,7 @@
         });
       }
     });
-    
+
     // Set initial UI language.
     updateLanguageUI();
   </script>
